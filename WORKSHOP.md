@@ -2,66 +2,206 @@
 
 ## Workshop Overview
 
-In this workshop, we rolled up our sleeves for a practical session. The main idea was to explore how we can work with and get insights from common types of unstructured data – specifically application logs and plain text. We used Docker to package the tools, which helped keep things consistent and manageable for everyone.
+A practical workshop demonstrating tools and techniques for handling and extracting value from unstructured data like application logs and raw text, using Dockerized environments.
 
-Our goals were to get a feel for these things about unstructured data:
+### Learning Objectives
 
-- Setting up a basic log aggregation pipeline with Loki, Promtail, and Grafana.
-- Trying out some real-time log queries using LogQL.
-- Understanding the fundamentals of vector embeddings and what semantic search is all about.
-- Working with a vector database (we used Qdrant) to index and search text data by its meaning.
-- And, in the process, getting a bit more hands-on experience with Docker Compose.
+- Set up a log aggregation pipeline using Loki, Promtail, and Grafana.
+- Perform real-time log querying and analysis using LogQL.
+- Understand the basics of vector embeddings and semantic search.
+- Set up a vector database (Qdrant) and index text data.
+- Perform semantic searches on text data using a sentence-transformer model.
+- Gain experience with Docker Compose for deploying multi-service applications.
 
-We tried to keep the entry bar pretty reasonable, mostly assuming a bit of familiarity with Docker and the command line, along with Python.
+### Target Audience
+
+Developers, DevOps engineers, data analysts, and anyone interested in practical applications of unstructured data processing.
+
+### Prerequisites
+
+- Basic understanding of Docker and command-line interface.
+- Docker Desktop (or equivalent) installed and running.
+- Python (3.8+) and pip installed.
+- Internet access (for pulling Docker images and Python packages).
 
 ---
 
 ## Directory Structure
 
-We had a project structure set up with all the necessary configuration files and scripts. This included our `docker-compose.yml` to define all the services, configuration for Promtail and Grafana, a simple Python app to generate logs, and another Python script for the semantic search demonstration. This organization helped keep all the pieces of the workshop clear and accessible.
+```
+.
+├── docker-compose.yml
+├── promtail-config.yaml
+├── grafana-provisioning/
+│   └── datasources/
+│       └── loki-datasource.yaml
+├── log-generator/
+│   ├── app.py
+│   └── Dockerfile
+├── semantic_search_demo.py
+└── WORKSHOP.md
+```
 
 ---
 
 ## Part 1: Log Management with Loki & Grafana
 
-In the first part of our session, we focused on handling application logs. We showcased a pipeline where:
+### 1. Start the Log Pipeline
 
-- A **Python script** acted as our simple, real-time log generator, simulating application output. This gave us a dynamic source of data to work with.
-- **Docker Compose** was used to orchestrate all our services. This was key to easily spinning up the entire logging stack (our log generator, Promtail, Loki, and Grafana) with a single command, simplifying setup for everyone.
-- **Promtail** played the role of the log collector. We explained its purpose was to automatically discover and forward logs from our generator to Loki. This helped attendees understand how logs from various containerized sources can be efficiently gathered.
-- **Loki** served as our central log aggregation system. We highlighted its design for efficiently storing and indexing large volumes of log data without needing extensive pre-parsing, which can be very cost-effective. For attendees, this meant seeing a system built for handling modern application logs at scale.
-- **Grafana** provided the interactive visualization layer. Once connected to Loki, it enabled attendees to see logs streaming in, and more importantly, to query them using **LogQL**. This demonstrated the practical benefit of searching, filtering, and beginning to analyze log data from a central dashboard, which is invaluable for monitoring application health and troubleshooting issues effectively.
+Build and start the log generator and supporting services:
+
+```sh
+docker-compose up -d --build log-generator
+```
+
+This will also start Loki, Promtail, Grafana, and Qdrant.
+
+### 2. Access Grafana
+
+- Open your browser and go to: [http://localhost:3000](http://localhost:3000)
+- **Login:**
+  - Username: `admin`
+  - Password: `admin`
+
+### 3. Add Loki as a Data Source (if not auto-provisioned)
+
+- Go to **Configuration > Data Sources**
+- Click **Add data source**
+- Choose **Loki**
+- Set URL to `http://loki:3100`
+- Click **Save & Test**
+
+### 4. Explore Logs
+
+- Go to **Explore** (compass icon)
+- Select **Loki** as the data source
+- Try these LogQL queries:
+
+```
+{container="log_generator_service"}
+{container="log_generator_service"} | json | level="ERROR"
+{container="log_generator_service"} |= "payment"
+count_over_time({container="log_generator_service"}[5m])
+```
+
+- **Observe:**
+  - Real-time log flow
+  - Filtering by log level, message content
+  - Aggregations over time
 
 ---
 
 ## Part 2: Semantic Search with Qdrant
 
-Next, we shifted our focus to exploring text data through semantic search. The key components here were:
+### 1. Ensure Qdrant is Running
 
-- **Python**, along with the **`sentence-transformers` library**, where we specifically used the lightweight `all-MiniLM-L6-v2` model (A 22 million parameters Minimally Distilled Language Model). We explained that this model's role is crucial: it converts plain text (our sample words and any search queries) into rich numerical representations called vector embeddings. This process is what allows us to capture the semantic meaning of the text. Attendees learned how accessible these powerful NLP models have become for such tasks.
-- **Qdrant**, which we introduced as a specialized **vector database**. Its purpose in our setup was to store the vector embeddings generated by the sentence transformer. We emphasized that Qdrant is optimized for efficiently searching through these high-dimensional vectors to find the closest matches based on similarity.
+Qdrant is started as part of `docker-compose up -d`. Confirm with:
 
-Through an interactive demo where attendees could provide search terms, they saw these terms get converted to vectors, and then witnessed Qdrant retrieve semantically similar words from the indexed dataset. This clearly highlighted how such a system moves beyond simple keyword matching to enable more intelligent and context-aware search experiences, offering a glimpse into building more intuitive applications.
+```sh
+docker-compose ps
+```
+
+You should see `qdrant_service` running and port 6333 mapped.
+
+### 2. Set Up Python Environment
+
+Install required libraries:
+
+```sh
+pip install sentence-transformers qdrant-client torch torchvision torchaudio
+```
+
+> **Note for Apple Silicon (M1/M2):**
+> If you encounter issues installing `torch`, see: https://pytorch.org/get-started/locally/
+
+### 3. Run the Semantic Search Demo
+
+```sh
+python semantic_search_demo.py
+```
+
+- The script will:
+  - Load a small embedding model
+  - Connect to Qdrant
+  - Index a set of sample words
+  - Enter an interactive search loop
+
+#### Example Search Terms
+
+- `royal female`
+- `fruit`
+- `vehicle`
+- `sadness`
+- `computer peripheral`
+- `hot season`
+
+- **Observe:**
+  - Results are based on meaning, not just keyword match
+  - Similarity scores for each result
 
 ---
 
 ## Cleanup
 
-To wrap things up neatly and ensure we left our systems as they were, we demonstrated how a single command, `docker-compose down -v`, would stop all the running Docker containers. The `-v` flag was important as it also removed the named and anonymous volumes, including the one Qdrant used for storing its data. This is always a good practice after working with Dockerized environments for development or workshops.
+To stop and remove all containers and volumes:
+
+```sh
+docker-compose down -v
+```
+
+- The `-v` flag also removes named and anonymous volumes (e.g., Qdrant data).
 
 ---
 
-## Key Concepts We Touched On
+## Key Concepts
 
-Throughout this session, we wove in several important ideas:
+### What is Unstructured Data?
 
-- We started with the concept of **Unstructured Data**, discussing how data like logs, text, and images often doesn't fit neatly into traditional, predefined database tables.
-- For logs, we looked at **Log Aggregation** – the practice of collecting logs from various sources into a central place for easier analysis. In our setup, **Loki** served as our storage and indexing system, while **Promtail** was the agent responsible for shipping logs from our container to Loki.
-- We got a practical taste of **LogQL**, Loki's query language, which allows users to filter, parse, and perform aggregations on logs in a way that's somewhat similar to how PromQL works for metrics.
-- Moving to text, we introduced **Vector Embeddings**. We talked about these as numerical representations (vectors) of text that aim to capture its semantic meaning, allowing computers to "understand" and compare text in a more nuanced way.
-- This naturally led us to **Semantic Search**, a technique that leverages these embeddings to find information based on meaning and context, going beyond simple keyword matching.
-- And finally, we saw the role of a **Vector Database** like **Qdrant**, which is specially designed to efficiently store, manage, and search through these high-dimensional vector embeddings.
+- Data that does not have a predefined data model or is not organized in a pre-defined manner (e.g., logs, text, images).
+
+### Log Aggregation
+
+- Collecting logs from multiple sources for centralized analysis.
+- **Loki** stores and indexes logs; **Promtail** ships logs from containers.
+
+### LogQL
+
+- Query language for Loki, similar to Prometheus queries but for logs.
+- Supports filtering, parsing, and aggregations.
+
+### Vector Embeddings
+
+- Represent text as high-dimensional numeric vectors capturing semantic meaning.
+
+### Semantic Search
+
+- Search by meaning, not just keywords, using vector similarity.
+
+### Vector Database (Qdrant)
+
+- Stores and searches high-dimensional vectors efficiently.
 
 ---
 
-It was a nice opportunity!
+## Troubleshooting Tips
+
+### Docker
+
+- **Port conflicts:** Make sure ports 3000 (Grafana), 3100 (Loki), 6333 (Qdrant REST) are free.
+- **Docker daemon not running:** Start Docker Desktop or your Docker service.
+- **Image pull failures:** Check your internet connection.
+
+### Python
+
+- **Package install errors:**
+  - For `torch` on M1/M2 Macs, see [PyTorch install guide](https://pytorch.org/get-started/locally/).
+- **Script errors:** Ensure Qdrant is running and accessible at `localhost:6333`.
+
+### Networking
+
+- **Grafana can't connect to Loki:** Check that both services are running and ports are mapped.
+- **Python script can't connect to Qdrant:** Ensure Qdrant is up and port 6333 is mapped to localhost.
+
+---
+
+🚀
