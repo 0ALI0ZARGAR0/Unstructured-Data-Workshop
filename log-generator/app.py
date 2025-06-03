@@ -1,9 +1,10 @@
 import json
 import random
-import sys
 import time
 import uuid
 from datetime import datetime
+
+from loguru import logger
 
 LEVELS = ["INFO", "WARNING", "ERROR", "DEBUG"]
 MESSAGES = [
@@ -18,7 +19,7 @@ SERVICES = ["order-processor", "user-service", "payment-gateway", "notification-
 
 
 def generate_structured_log(event_id):
-    log = {
+    log_payload = {
         "timestamp": datetime.utcnow().isoformat() + "Z",
         "level": random.choice(LEVELS),
         "message": random.choice(MESSAGES),
@@ -26,14 +27,13 @@ def generate_structured_log(event_id):
         "request_id": str(uuid.uuid4()),
         "event_id": event_id
     }
-    print(json.dumps(log), flush=True)
+    logger.log(log_payload["level"], log_payload)
 
 
 def generate_unstructured_log(event_id):
-    timestamp = datetime.utcnow().isoformat() + "Z"
     level = random.choice(LEVELS)
-    log = f"{timestamp} [{level}] Unstructured log: Something happened here! Event: {event_id}"
-    print(log, flush=True)
+    message_content = f"Unstructured log: Something happened here! Event: {event_id}"
+    logger.log(level, message_content)
 
 
 def main():
@@ -48,4 +48,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main() 
+    main()

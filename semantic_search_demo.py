@@ -1,5 +1,4 @@
 import sys
-import time
 
 from qdrant_client import QdrantClient, models
 from qdrant_client.http.models import PointStruct
@@ -61,7 +60,7 @@ def main():
     vectors = model.encode(texts, show_progress_bar=True)
 
     print("Upserting points to Qdrant...")
-    points = [
+    points_to_upsert = [
         PointStruct(
             id=doc["id"],
             vector=vector.tolist() if hasattr(vector, 'tolist') else list(vector),
@@ -69,8 +68,32 @@ def main():
         )
         for doc, vector in zip(documents, vectors)
     ]
-    client.upsert(collection_name=COLLECTION_NAME, points=points, wait=True)
+    client.upsert(collection_name=COLLECTION_NAME, points=points_to_upsert, wait=True)
     print("Upsert complete.")
+
+    print("\n--- Vectors in the database after creation ---")
+    try:
+        retrieved_points, _ = client.scroll(
+            collection_name=COLLECTION_NAME,
+            limit=len(documents) + 5, # Fetch a bit more just in case, or set to actual count
+            with_payload=True,
+            with_vectors=True
+        )
+        if not retrieved_points:
+            print("No points found in the collection.")
+        for point in retrieved_points:
+            print(f"ID: {point.id}")
+            print(f"  Payload: {point.payload}")
+            # Printing the full vector can be very verbose.
+            # You might want to print just a few dimensions or its length.
+            print(f"  Vector (first 5 dims): {point.vector[:5]}... (Total dims: {len(point.vector)})")
+            # If you want to print the full vector, uncomment the line below
+            # print(f"  Vector: {point.vector}")
+            print("-" * 20)
+    except Exception as e:
+        print(f"Error retrieving points: {e}")
+    print("--- End of vector display ---")
+
 
     print("\nSemantic search ready! Try queries like: 'royal female', 'fruit', 'vehicle', 'sadness', 'computer peripheral', 'hot season'.")
     while True:
@@ -101,4 +124,4 @@ def main():
             print(f"  - {text} (score: {score:.4f})")
 
 if __name__ == "__main__":
-    main() 
+    main()

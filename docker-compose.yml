@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   log-generator:
-    build: ./log-generator
+    build: ./log-generator # Ensure you have a ./log-generator directory with a Dockerfile
     container_name: log_generator_service
     restart: unless-stopped
 
@@ -11,7 +11,7 @@ services:
     container_name: loki_service
     ports:
       - "3100:3100"
-    command: -config.file=/etc/loki/local-config.yaml
+    command: -config.file=/etc/loki/local-config.yaml # Uses default Loki config in the image
     restart: unless-stopped
 
   promtail:
@@ -19,7 +19,7 @@ services:
     container_name: promtail_service
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./promtail-config.yaml:/etc/promtail/config.yaml
+      - ./promtail-config.yaml:/etc/promtail/config.yaml # Mounts the config file below
     command: -config.file=/etc/promtail/config.yaml
     depends_on:
       - loki
@@ -35,7 +35,9 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=admin
       - GF_USERS_ALLOW_SIGN_UP=false
     volumes:
+      # Ensure these host directories exist if you intend to use provisioning
       - ./grafana-provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ./grafana-provisioning/dashboards:/etc/grafana/provisioning/dashboards
     depends_on:
       - loki
     restart: unless-stopped
@@ -49,4 +51,4 @@ services:
     # Uncomment the next line to persist Qdrant data locally
     # volumes:
     #   - ./qdrant_storage:/qdrant/storage
-    restart: unless-stopped 
+    restart: unless-stopped

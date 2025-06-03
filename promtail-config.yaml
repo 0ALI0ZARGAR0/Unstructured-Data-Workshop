@@ -3,21 +3,29 @@ server:
   grpc_listen_port: 0
 
 positions:
-  filename: /tmp/positions.yaml
+  filename: /tmp/positions.yaml # Standard: Promtail needs a place to store offsets of logs it has read.
 
 clients:
-  - url: http://loki:3100/loki/api/v1/push
+  - url: http://loki:3100/loki/api/v1/push # Correct: Points to your Loki service as defined in docker-compose.
 
 scrape_configs:
-  - job_name: docker_logs
+  - job_name: docker_logs # A descriptive name for this scrape job.
     docker_sd_configs:
-      - host: unix:///var/run/docker.sock
-        refresh_interval: 5s
+      - host: unix:///var/run/docker.sock # Correct: Tells Promtail to discover containers via the Docker socket.
+        refresh_interval: 5s # A reasonable interval to check for new containers.
     relabel_configs:
+      # This rule correctly extracts the container name without the leading slash.
+      # e.g., changes "/log_generator_service" to "log_generator_service" for the 'container' label.
       - source_labels: [__meta_docker_container_name]
-        regex: "/(.*)"
+        regex: "^/(.*)$"
+        replacement: "$1"
         target_label: container
+
+      # This rule correctly labels logs with whether they came from 'stdout' or 'stderr'.
       - source_labels: [__meta_docker_container_log_stream]
         target_label: logstream
+
+      # This rule is useful for converting any Docker labels on your containers
+      # into Loki labels.
       - action: labelmap
-        regex: __meta_docker_container_label_(.+) 
+        regex: __meta_docker_container_label_(.+)
