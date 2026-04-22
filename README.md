@@ -1,5 +1,64 @@
 # Hands-On Unstructured Data: From Logs to Semantic Search
 
+Docker Compose workshop for aggregating container logs in Grafana Loki and for dense retrieval of short text using transformer embeddings in Qdrant.
+
+## Core Concepts & Methodology
+
+- **Log pipeline:** Promtail discovers and ships container stdout/stderr labels to **Loki**; Grafana queries with **LogQL** (label selectors, line filters, parsers where applicable).
+- **Embeddings:** `sentence-transformers` loads **all-MiniLM-L6-v2** (Siamese/Bi-encoder style sentence embedding; mean pooling over subword outputs). Texts are mapped to fixed-size vectors in ℝ^d.
+- **Vector store & retrieval:** Embeddings are **upserted** into Qdrant with **cosine distance** as the collection metric; queries use the same encoder and **approximate nearest neighbor** search (`client.search`, top-*k* by score).
+- **Data generation:** Synthetic logs mix structured JSON-like fields and unstructured lines for realistic volume and label diversity.
+
+## Technologies Used
+
+- **Languages:** Python 3 (host scripts; log generator image uses Python 3.9-slim)
+- **Containers / orchestration:** Docker, Docker Compose (`docker-compose.yml`)
+- **Observability stack:** Grafana Loki 2.9.5, Grafana Promtail 2.9.5, Grafana 10.4.2 (provisioned datasources/dashboards)
+- **Vector database:** Qdrant v1.9.0
+- **ML / NLP (host):** `sentence-transformers`, PyTorch, Hugging Face `transformers`, `qdrant-client` (see `requirements.txt`)
+- **Logging (generator container):** Loguru
+
+## Features
+
+- Spins up **log-generator**, **Loki**, **Promtail**, and **Grafana** as one stack for end-to-end log flow.
+- **Structured and unstructured** synthetic application logs at configurable intervals.
+- **Grafana** UI on port 3000 with Loki datasource wiring for exploration and **LogQL**.
+- **Qdrant** HTTP/gRPC ports exposed for local indexing and search experiments.
+- **`semantic_search_demo.py`:** (re)creates a collection, encodes a fixed word list, upserts vectors, then runs an **interactive CLI** for semantic top-5 retrieval.
+
+## Quick Start
+
+```bash
+git clone https://github.com/0ALI0ZARGAR0/Unstructured-Data-Workshop.git && cd Unstructured-Data-Workshop
+docker compose up -d --build
+```
+
+Optional (semantic search demo on the host; requires Qdrant from the stack on `localhost:6333`):
+
+```bash
+pip install -r requirements.txt && python semantic_search_demo.py
+```
+
+- **Grafana:** http://localhost:3000 (default admin credentials set in `docker-compose.yml`).
+- **Loki:** http://localhost:3100 (Promtail pushes here; Grafana is the usual query surface).
+
+## System Overview
+
+```mermaid
+flowchart LR
+  subgraph logs["Log analytics path"]
+    LG["log-generator\n(Python / Loguru)"] --> PT["Promtail"]
+    PT --> LK["Loki"]
+    LK --> GF["Grafana\n(LogQL)"]
+  end
+  subgraph vec["Semantic search path (host)"]
+    ST["SentenceTransformer\nall-MiniLM-L6-v2"] --> QC["qdrant-client"]
+    QC --> QD[("Qdrant\n:6333")]
+  end
+```
+
+---
+
 ## Workshop Overview
 
 In this workshop, we rolled up our sleeves for a practical session. The main idea was to explore how we can work with and get insights from common types of unstructured data – specifically application logs and plain text. We used Docker to package the tools, which helped keep things consistent and manageable for everyone.
